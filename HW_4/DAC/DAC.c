@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
+#include <math.h>
 
 // SPI Defines
 // We are going to use SPI 0, and allocate it to the following GPIO pins
@@ -11,7 +12,7 @@
 #define PIN_SCK  18
 #define PIN_MOSI 19
 
-void writeDac();
+void writeDac(int, float);
 
 
 static inline void cs_select(uint cs_pin) {
@@ -33,7 +34,7 @@ int main()
     stdio_init_all();
 
     // SPI initialisation. This example will use SPI at 1MHz.
-    spi_init(SPI_PORT, 1000);
+    spi_init(SPI_PORT, 1000*1000);
     gpio_set_function(PIN_MISO, GPIO_FUNC_SPI);
     gpio_set_function(PIN_CS,   GPIO_FUNC_SIO);
     gpio_set_function(PIN_SCK,  GPIO_FUNC_SPI);
@@ -44,18 +45,31 @@ int main()
     gpio_put(PIN_CS, 1);
     // For more examples of SPI use see https://github.com/raspberrypi/pico-examples/tree/master/spi
 
+    float t = 0.0f;
+
     while (true) {
-        printf("Hello, world!\n");
-        sleep_ms(1000);
-        writeDac();
+        float sin_voltage = 1.65f * sinf(2*M_PI*2*t) + 1.65f;
+
+        writeDac(0, sin_voltage);
+
+        float triangular = 3.3f*(2*fabsf(t-floorf(t+0.5f)));
+
+        writeDac(1, triangular);
+
+        t += 0.01f;
+        sleep_ms(10);
     }
 }
 
-void writeDac(){
+void writeDac(int channel, float voltage){
     uint8_t data[2];
     int len = 2;
-    data[0] = 0b01111000;
-    data[1] = 0b00000000;
+    uint16_t v = voltage * 1023.0f / 3.3f; 
+
+    uint16_t bits = (channel << 15) | (1 << 14) | (1 << 13) | (1 << 12) | (v << 2) | (0 << 1) | (0 << 0);
+
+    data[0] = (bits >> 8) & 0xFF;
+    data[1] = bits & 0xFF;
     cs_select(PIN_CS);
     spi_write_blocking(SPI_PORT, data, len); // where data is a uint8_t array with length len
     cs_deselect(PIN_CS);
