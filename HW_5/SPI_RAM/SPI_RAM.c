@@ -66,18 +66,18 @@ int main()
     for(uint16_t i=0; i<1000; i++){
         float angle = 2*M_PI*i/1000;
         float sin_voltage = 1.65f * sinf(angle) + 1.65f;
-        ram_write(i, sin_voltage);
+        ram_write(i*4, sin_voltage);
     }
 
     printf("Done!\n");
 
-    uint16_t counter = 0;
+    uint16_t address = 0;
 
     while (true) {
-        float sin_voltage = ram_read(counter);
-        printf("Current Voltage at step %u: %.3f V\n", counter, sin_voltage);
+        float sin_voltage = ram_read(address);
+        printf("Current Voltage at step %u: %.3f V\n", address/4, sin_voltage);
         writeDac(sin_voltage);
-        counter = (counter + 1)% 1000;
+        address = (address + 4) % (1000 * 4);
         sleep_ms(1);
     }
 }
@@ -121,10 +121,10 @@ float ram_read(uint16_t a){
     out_buff[1] = (a >> 8)&0xFF;
     out_buff[2] = a&0xFF;
 
-    out_buff[3] = 0b00000001;
-    out_buff[4] = 0b00000001;
-    out_buff[5] = 0b00000001;
-    out_buff[6] = 0b00000001;
+    out_buff[3] = 0b00000000;
+    out_buff[4] = 0b00000000;
+    out_buff[5] = 0b00000000;
+    out_buff[6] = 0b00000000;
 
     cs_select(PIN_CS_RAM);
     spi_write_read_blocking(SPI_PORT, out_buff, in_buff, 7);
