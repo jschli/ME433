@@ -76,16 +76,16 @@ int main()
     while (true) {
         float sin_voltage = ram_read(counter);
         printf("Current Voltage at step %u: %.3f V\n", counter, sin_voltage);
-        //writeDac(v);
+        writeDac(sin_voltage);
         counter = (counter + 1)% 1000;
-        sleep_ms(1000);
+        sleep_ms(1);
     }
 }
 
 void init_ram(){
 
     uint8_t buff[2];
-    buff[0] = 0b00000101; //i want to change the status register
+    buff[0] = 0b00000001; //i want to change the status register
     buff[1] = 0b01000000; // to sequential mode
 
 
@@ -104,10 +104,10 @@ void ram_write(uint16_t a, float v){
     union FloatInt num;
     num.f = v;
 
-    buff[3] = (num.i >> 24)&0xFF; //leftmost 8bit
-    buff[4] = (num.i >> 16)&0xFF;//inner leftmost 8bit
-    buff[5] = (num.i >> 8)&0xFF;
-    buff[6] = (num.i)&0xFF;
+    buff[3] = (num.i >> 24); //leftmost 8bit
+    buff[4] = (num.i >> 16);//inner leftmost 8bit
+    buff[5] = (num.i >> 8);
+    buff[6] = (num.i);
     cs_select(PIN_CS_RAM);
     spi_write_blocking(SPI_PORT, buff, 7); 
     cs_deselect(PIN_CS_RAM);
@@ -143,7 +143,7 @@ void writeDac(float voltage){
     int len = 2;
     uint16_t v = voltage * 1023.0f / 3.3f; 
 
-    uint16_t bits = (0 << 15) | (1 << 14) | (1 << 13) | (1 << 12) | (v << 2) | (0 << 1) | (0 << 0);
+    uint16_t bits = (1 << 15) | (1 << 14) | (1 << 13) | (1 << 12) | (v << 2) | (0 << 1) | (0 << 0);
 
     data[0] = (bits >> 8) & 0xFF;
     data[1] = bits & 0xFF;
