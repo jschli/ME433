@@ -1,6 +1,5 @@
 
 #include "pico/stdlib.h"
-#include "hardware/pwm.h"
 
 #define MOTOR_PIN 17
 
