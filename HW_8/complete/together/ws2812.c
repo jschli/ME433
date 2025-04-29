@@ -24,10 +24,11 @@
 #error Attempting to use a pin>=32 on a platform that does not support it
 #endif
 
-typedef struct {
-float base_hue;    
-float servo_angle;  
-bool increasing;    
+#define MOTOR_PIN 17
+
+typedef struct {  
+    float servo_angle; 
+    bool increasing;   
 } State;
 
 // link three 8bit colors together
@@ -123,6 +124,15 @@ static inline uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b) {
             (uint32_t) (b);
 }
 
+void set_servo_angle(float angle) {
+    uint16_t wrap = 46875;
+    float pulse_min = 0.5;  
+    float pulse_max = 2.5;  
+    float pulse_width = pulse_min + (angle / 180.0) * (pulse_max - pulse_min);
+    uint16_t duty = (pulse_width / 20) * wrap;
+    pwm_set_gpio_level(MOTOR_PIN, duty);
+}
+
 int main() {
     //set_sys_clock_48();
     stdio_init_all();
@@ -141,7 +151,21 @@ int main() {
 
     ws2812_program_init(pio, sm, offset, WS2812_PIN, 800000, IS_RGBW);
 
+    gpio_set_function(MOTOR_PIN, GPIO_FUNC_PWM);
+    uint slice_num = pwm_gpio_to_slice_num(MOTOR_PIN);
+
+    float div = 64.0;          
+    uint16_t wrap = 46875; //150 /(div + freq)
+    pwm_set_clkdiv(slice_num, div);
+    pwm_set_wrap(slice_num, wrap);
+    pwm_set_enabled(slice_num, true);
+
+
     float base_hue = 0.0f;
+    State state = {
+        .servo_angle = 0.0f,
+        .increasing = true
+    };
 
     while (true) {
 
@@ -151,20 +175,17 @@ int main() {
         put_pixel(pio, sm, urgb_u32(color.r, color.g, color.b));
     }
 
-        base_hue = fmod(base_hue + 3.6f, 360.0f);
+        base_hue = fmod(base_hue + 1.44f, 360.0f);
 
     // Update servo position
     if (state.increasing) {
-        state.servo_angle += 0.36f; 
+        state.servo_angle += 0.72f; 
         if (state.servo_angle >= 180.0f) state.increasing = false;
     } else {
-        state.servo_angle -= 0.36f;
+        state.servo_angle -= 0.72f;
         if (state.servo_angle <= 0.0f) state.increasing = true;
     }
     set_servo_angle(state.servo_angle);
-    
-    // Update rainbow base hue 
-    state.base_hue = fmod(state.base_hue + 0.72f, 360.0f);
     
     sleep_ms(20);
     }
