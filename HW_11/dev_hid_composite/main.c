@@ -26,11 +26,23 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #include "bsp/board_api.h"
 #include "tusb.h"
 
 #include "usb_descriptors.h"
+#include "hardware/gpio.h"
+#define BUTTON_UP 20
+#define BUTTON_RIGHT 19
+#define BUTTON_LEFT 18
+#define BUTTON_DOWN 17
+#define BUTTON_MODE 16
+
+volatile bool remote_mode = false;
+
+void check_mode_switch();
+void get_circle_deltas(int8_t *dx, int8_t *dy);
 
 //--------------------------------------------------------------------+
 // MACRO CONSTANT TYPEDEF PROTYPES
@@ -52,10 +64,36 @@ static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 void led_blinking_task(void);
 void hid_task(void);
 
+typedef struct {
+  uint32_t pressed_time;
+  bool is_pressed;
+} button_state_t;
+
 /*------------- MAIN -------------*/
 int main(void)
 {
   board_init();
+
+  gpio_init(BUTTON_UP);
+  gpio_init(BUTTON_RIGHT);
+  gpio_init(BUTTON_LEFT);
+  gpio_init(BUTTON_DOWN);
+  gpio_init(BUTTON_MODE);
+
+  gpio_set_dir(BUTTON_UP, GPIO_IN);
+  gpio_set_dir(BUTTON_RIGHT, GPIO_IN);
+  gpio_set_dir(BUTTON_LEFT, GPIO_IN);
+  gpio_set_dir(BUTTON_DOWN, GPIO_IN);
+  gpio_set_dir(BUTTON_MODE, GPIO_IN);
+
+  gpio_pull_up(BUTTON_UP); 
+  gpio_pull_up(BUTTON_RIGHT); 
+  gpio_pull_up(BUTTON_LEFT); 
+  gpio_pull_up(BUTTON_DOWN);
+  gpio_pull_up(BUTTON_MODE); 
+
+  gpio_init(PICO_DEFAULT_LED_PIN);
+  gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 
   // init device stack on configured roothub port
   tud_init(BOARD_TUD_RHPORT);
@@ -67,7 +105,7 @@ int main(void)
   while (1)
   {
     tud_task(); // tinyusb device task
-    led_blinking_task();
+    //led_blinking_task();
 
     hid_task();
   }
@@ -138,10 +176,22 @@ static void send_hid_report(uint8_t report_id, uint32_t btn)
 
     case REPORT_ID_MOUSE:
     {
-      int8_t const delta = 5;
 
-      // no button, right + down, no scroll, no pan
-      tud_hid_mouse_report(REPORT_ID_MOUSE, 0x00, delta, delta, 0, 0);
+      check_mode_switch();
+      
+      int8_t dx = 0, dy = 0;
+      if (remote_mode){
+        get_circle_deltas(&dx, &dy);
+      }
+      else {
+        //put code here for the button checker
+      }
+      if (dx != 0 || dy != 0) {
+        // no button, right + down, no scroll, no pan
+        tud_hid_mouse_report(REPORT_ID_MOUSE, 0x00, dx, dy, 0, 0);
+      } else {
+        tud_hid_mouse_report(REPORT_ID_MOUSE, 0x00, 0, 0, 0, 0);
+      }
     }
     break;
 
@@ -303,4 +353,29 @@ void led_blinking_task(void)
 
   board_led_write(led_state);
   led_state = 1 - led_state; // toggle
+}
+
+void check_mode_switch(){
+  bool last_state = true;
+  bool current = gpio_get(BUTTON_MODE);
+  if (!current && last_state){
+    remote_mode = !remote_mode;
+    gpio_put(PICO_DEFAULT_LED_PIN, remote_mode);
+  }
+  last_state = current;
+}
+
+void get_circle_deltas(int8_t *dx, int8_t *dy){
+  float radius = 3.0f;
+  uint32_t period = 4000.0f;
+  float last_x = 0;
+  float last_y = 0;
+  uint32_t t = board_millis() % period;
+  float angle = (2.0f * M_PI * t) / period;
+  float x = radius * cosf(angle);
+  float y = radius * sinf(angle);
+  *dx = (int8_t)roundf(x-last_x);
+  *dy = (int8_t)roundf(y-last_y);
+  last_x = x;
+  last_y = y;
 }
