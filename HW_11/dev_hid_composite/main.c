@@ -43,6 +43,8 @@ volatile bool remote_mode = false;
 
 void check_mode_switch();
 void get_circle_deltas(int8_t *dx, int8_t *dy);
+void update_button_states();
+void get_mouse_deltas(int8_t *dx, int8_t *dy);
 
 //--------------------------------------------------------------------+
 // MACRO CONSTANT TYPEDEF PROTYPES
@@ -68,6 +70,10 @@ typedef struct {
   uint32_t pressed_time;
   bool is_pressed;
 } button_state_t;
+
+button_state_t btn_states[4] = {0};
+const uint8_t btn_pins[4] = {BUTTON_UP, BUTTON_DOWN, BUTTON_LEFT, BUTTON_RIGHT};
+
 
 /*------------- MAIN -------------*/
 int main(void)
@@ -184,7 +190,8 @@ static void send_hid_report(uint8_t report_id, uint32_t btn)
         get_circle_deltas(&dx, &dy);
       }
       else {
-        //put code here for the button checker
+        update_button_states();
+        get_mouse_deltas(&dx, &dy);
       }
       if (dx != 0 || dy != 0) {
         // no button, right + down, no scroll, no pan
@@ -378,4 +385,56 @@ void get_circle_deltas(int8_t *dx, int8_t *dy){
   *dy = (int8_t)roundf(y-last_y);
   last_x = x;
   last_y = y;
+}
+
+void update_button_states() {
+  for (int i = 0; i < 4; i++) {
+    bool pressed = !gpio_get(btn_pins[i]);
+    if (pressed){
+      if (!btn_states[i].is_pressed){
+        btn_states[i].pressed_time = board_millis();
+        btn_states[i].is_pressed = true;
+      }
+    }
+    else {
+      btn_states[i].is_pressed = false;
+    }
+  }
+}
+
+int8_t get_speed_delta(uint32_t elapsed_ms) {
+  switch (elapsed_ms / 500) {
+      case 0:  return 1; 
+      case 1:  return 2; 
+      case 2:
+      case 3:  return 4; 
+      default: return 5; 
+  }
+}
+
+
+void get_mouse_deltas(int8_t *dx, int8_t *dy){
+  *dx = 0;
+  *dy = 0;
+  uint32_t t_now = board_millis();
+  //UP
+  if (btn_states[0].is_pressed){
+    uint32_t t_elapsed = t_now - btn_states[0].pressed_time;
+    *dy = -get_speed_delta(t_elapsed);
+  }
+  //DOWN
+  if (btn_states[1].is_pressed){
+    uint32_t t_elapsed = t_now - btn_states[1].pressed_time;
+    *dy = get_speed_delta(t_elapsed);
+  }
+  //LEFT
+  if (btn_states[2].is_pressed){
+    uint32_t t_elapsed = t_now - btn_states[2].pressed_time;
+    *dx = -get_speed_delta(t_elapsed);
+  }
+  //RIGHT
+  if (btn_states[3].is_pressed){
+    uint32_t t_elapsed = t_now - btn_states[3].pressed_time;
+    *dx = get_speed_delta(t_elapsed);
+  }
 }
