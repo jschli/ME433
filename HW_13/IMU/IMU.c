@@ -38,9 +38,6 @@ void mpu_read_bytes(uint8_t reg, uint8_t *buffer, uint8_t len);
 void mpu_init();
 void draw_line(int x0, int y0, int x1, int y1);
 
-#define min(a, b) ((a) < (b) ? (a) : (b))
-#define max(a, b) ((a) > (b) ? (a) : (b))
-
 
 
 int main()
