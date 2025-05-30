@@ -31,13 +31,6 @@
 #define I2C_SCL 9
 
 #define MPU_ADDR 0x68
-#define MCP_adress 0b0100000
-
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 32
-#define CENTER_X (SCREEN_WIDTH/2)  // 64
-#define CENTER_Y (SCREEN_HEIGHT/2) // 16
-#define SCALE_FACTOR 20  // Pixels per g-force
 
 void mpu_write_reg(uint8_t reg, uint8_t val);
 uint8_t mpu_read_reg(uint8_t reg);
@@ -88,11 +81,6 @@ int main()
         int end_x = 64 - (int)(az_g * 64);  
         int end_y = 16 - (int)(ay_g * 16); 
         
-        // Clamp values to screen boundaries
-        //end_x = max(min(end_x, 127), 0);
-        //end_y = max(min(end_y, 31), 0);
-        
-        // Print values (convert to g-forces: ±2g range = 16384 LSB/g)
         printf("Accel: X:%.2fg\tY:%.2fg\tZ:%.2fg\tend_x:%d\tend_y:%d\n", 
                 (float)ax/16384.0, 
                 (float)ay/16384.0,
@@ -110,12 +98,8 @@ int main()
 }
 
 void mpu_init() {
-    // Wake up device (clear sleep mode bit 6)
     mpu_write_reg(PWR_MGMT_1, 0x00);
     
-    // Optional: Verify WHO_AM_I register
-    uint8_t whoami = mpu_read_reg(WHO_AM_I);
-    printf("WHO_AM_I: 0x%02X (should be 0x68)\n", whoami);
 }
 
 void mpu_write_reg(uint8_t reg, uint8_t val) {
@@ -125,13 +109,13 @@ void mpu_write_reg(uint8_t reg, uint8_t val) {
 
 uint8_t mpu_read_reg(uint8_t reg) {
     uint8_t val;
-    i2c_write_blocking(I2C_PORT, MPU_ADDR, &reg, 1, true); // Send register address
-    i2c_read_blocking(I2C_PORT, MPU_ADDR, &val, 1, false); // Read value
+    i2c_write_blocking(I2C_PORT, MPU_ADDR, &reg, 1, true); 
+    i2c_read_blocking(I2C_PORT, MPU_ADDR, &val, 1, false); 
     return val;
 }
 
 void mpu_read_bytes(uint8_t reg, uint8_t *buffer, uint8_t len) {
-    i2c_write_blocking(I2C_PORT, MPU_ADDR, &reg, 1, true); // Send starting register
+    i2c_write_blocking(I2C_PORT, MPU_ADDR, &reg, 1, true); 
     i2c_read_blocking(I2C_PORT, MPU_ADDR, buffer, len, false);
 }
 
